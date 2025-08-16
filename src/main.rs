@@ -35,6 +35,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         eprintln!("CSV Row {}, {:?}", row, raw_tx);
+
+        match raw_tx.transaction_type {
+            types::RawTransactionType::Deposit | types::RawTransactionType::Withdrawal => {
+                eprintln!("Found a transaction with ID {}.", raw_tx.transaction_id);
+            }
+            types::RawTransactionType::Dispute
+            | types::RawTransactionType::Resolve
+            | types::RawTransactionType::Chargeback => {
+                eprintln!(
+                    "Found an effect for transaction with ID {}.",
+                    raw_tx.transaction_id
+                );
+            }
+        }
     }
 
     Ok(())
