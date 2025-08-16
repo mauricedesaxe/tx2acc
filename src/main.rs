@@ -1,8 +1,9 @@
 mod types;
 use std::collections::HashMap;
 use std::env;
+use std::fs::File;
 use std::path::Path;
-use types::{Client, ProcessedTransaction};
+use types::{Client, ProcessedTransaction, RawTransaction};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -16,6 +17,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut transactions: HashMap<u32, ProcessedTransaction> = HashMap::new();
     let mut clients: HashMap<u16, Client> = HashMap::new();
+
+    let file = File::open(input_file)?;
+    let mut csv_reader = csv::ReaderBuilder::new()
+        .trim(csv::Trim::All)
+        .from_reader(file);
+
+    let mut row = 0;
+    for result in csv_reader.deserialize() {
+        row += 1;
+        let raw_tx: RawTransaction = match result {
+            Ok(tx) => tx,
+            Err(e) => {
+                eprintln!("Error parsing row: {}", e);
+                continue;
+            }
+        };
+
+        eprintln!("CSV Row {}, {:?}", row, raw_tx);
+    }
 
     Ok(())
 }
