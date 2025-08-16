@@ -55,4 +55,6 @@ fn main() {
     let input_file = if args.len() > 1 { &args[1] } else { "unknown" };
     eprintln!("input = {}", input_file);
 
+    let mut transactions: HashMap<u32, ProcessedTransaction> = HashMap::new();
+    let mut clients: HashMap<u16, Client> = HashMap::new();
 }
