@@ -1,4 +1,7 @@
-#[derive(Debug, Clone)]
+use serde::Deserialize;
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum RawTransactionType {
     Deposit,
     Withdrawal,
@@ -7,12 +10,15 @@ pub enum RawTransactionType {
     Chargeback,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct RawTransaction {
-    transaction_type: RawTransactionType,
-    client_id: u16,
-    transaction_id: u32,
-    amount: Option<u64>,
+    #[serde(rename = "type")]
+    pub transaction_type: RawTransactionType,
+    #[serde(rename = "client")]
+    pub client_id: u16,
+    #[serde(rename = "tx")]
+    pub transaction_id: u32,
+    pub amount: Option<f64>,
 }
 
 #[derive(Debug, Clone)]
