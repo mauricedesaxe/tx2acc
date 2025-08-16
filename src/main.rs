@@ -41,6 +41,15 @@ struct ProcessedTransaction {
     amount: Option<u64>,
 }
 
+#[derive(Debug, Clone)]
+struct Client {
+    client_id: u16,
+    available: u64,
+    held: u64,
+    total: u64,
+    locked: bool,
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     let input_file = if args.len() > 1 { &args[1] } else { "unknown" };
