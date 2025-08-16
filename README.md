@@ -1,6 +1,116 @@
 # Transactions to Accounts Converter
 
-## Background
+## Approach
+
+### For starters, I'll avoid optimizing for performance through concurrency/parallelism.
+
+I've researched the 1B row challenge for this.
+I've found they often do a number of optimizations like:
+- splitting rows by bytes instead of using Strings
+- using `crossbeam-channel` vs `std::sync::mpsc` as they are more feature rich and performant
+- using `hashbrown` instead of the `std::collections::HashMap` (again, more performant)
+
+If you read the approaches I've outlined, likely `crossbeam-channel` doesn't really
+apply to them as much. More likely, you might use a Mutex or RwLock on a HashMap.
+Or, maybe, you could use a `DashMap` from the `dashmap` crate (which allows us
+to "shard" the data in buckets for concurrent use).
+
+I won't do any of these optimizations for this take-home.
+I think a higher initial priority is making sure we correctly scan through
+the transactions to find and apply disputes/resolves/chargebacks correctly.
+
+### How should we tackle the `transaction -> dispute/resolution/chargeback` mapping?
+
+Note: for the sake of this discussion, I'll call disputes/resolves/chargebacks
+"effects" not "transactions".
+
+**TL;DR:** If you read below, you will understand the various approaches I've considered.
+In my decision to take the first approach presented, I've assumed:
+- You don't want me to prevent fraud
+- You want me to apply transactions and **effects** chronologically
+- The provided CSV will not be immense
+- I'd rather use more memory than disk I/O for speed and simplicity
+- Simpler is better for the sake of this take-home
+I have though documented both how I could prevent fraud and reduce memory usage.
+
+I've spent quite some time thinking about this part.
+There is one key assumption that is, at this moment, messing with me.
+
+Let's imagine this chronological situation:
+1. user deposits $100 (tx1)
+2. user withdraws $50 (tx2)
+3. user disputes tx1
+
+If processed chronologically, we allow potential fraud.
+There is nowhere in the PDF that tells me to prevent this.
+But I have found a few ways to prevent it and I like some of those designs.
+
+#### If you don't want to prevent fraud...
+
+In this case you have to process transactions for each client as they are received
+from the initial CSV file, assumed chronologically.
+
+**First approach**
+
+One way is to loop through all rows, keeping a HashMap of `Client` structs and updating their balances as you go while also keeping a HashMap of `Transaction` structs to check if an
+**effect** is valid (i.e. has a transaction existent previous to it, the tx has the right status to apply the new **effect** to it).
+
+Imagine the `Transaction` struct contains the following fields:
+`{ tx_id, client_id, amount, tx_type, dispute_status }`.
+
+This is simple & straightforward, it allows for concurrency if you don't touch the
+same client at once, but it comes with a big memory cost (need to keep all clients and transactions in memory).
+
+**Second approach**
+
+Another way, which is more memory efficient, but introduces disk I/O, is to
+loop through all rows and sort them by `client_id` in chunks (big enough to fit in memory).
+Once you sort a chunk, you write it to a temp file. Then you merge these files.
+
+After merging, you can iterate through these sorted transactions to calculate client balances.
+The magic here is that all of a client's transactions and **effects** will be adjacent,
+so you don't have to hold them in memory for long. You flush them as soon as
+you're done with the client.
+
+In the first way, you had to keep all clients in memory because you didn't know for a fact whether new transactions/**effects** for existent clients would come up later.
+
+#### If you want to prevent fraud...
+
+If you want to prevent the fraud, it's important to only apply transactions to
+balances once you've gone through all transactions and their **effects**.
+This way you know the final state diff that a transaction will cause
+(whether it is valid/disputed/resolved/chargedback).
+
+**Third approach**
+
+One way you can do that is to loop through all rows, keeping a HashMap of
+`Transaction` structs. You update them with any **effects** you find but you do not
+keep `Client` balances yet.
+
+At the end, you iterate through these new "processed" transactions
+to calculate client balances. This will prevent fraudulent withdrawals
+because the **effects** to a transaction are applied before the withdrawal is processed.
+I.e.: a chargebacked deposit won't apply.
+
+This can also result in high memory usage if there are a lot of rows though
+since you will keep all transactions in memory until the end of the process.
+
+**Fourth approach**
+
+Similarly as in the "don't prevent fraud" section, the other way here is
+more memory efficient, but introduces disk I/O. You loop through all rows
+but this time you sort them by `tx_id` in chunks (big enough to fit in memory).
+Once you sort a chunk, you write it to a temp file. Then you merge these files.
+
+After the merge, you can iterate through these sorted transactions to calculate client balances.
+The magic here is that a transaction and all its **effects** will be adjacent, so you don't
+have to hold them in memory for long if you apply them to the client's balance as you go.
+You can flush them as soon as you are done with that `tx_id`.
+
+In the third approach, you had to keep all transactions in memory because you
+needed to make sure an **effect** doesn't come up later for a given `tx_id`.
+
+## Background (no need to read this if you know the PDF already)
 
 Takes in a CSV file similar to the ones in `data/tx`.
 These will contain transactions in the format of:
