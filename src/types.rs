@@ -41,5 +41,5 @@ pub struct ProcessedTransaction {
     dispute_status: DisputeStatus,
     client_id: u16,
     transaction_id: u32,
-    amount: Option<u64>,
+    amount: u64,
 }
