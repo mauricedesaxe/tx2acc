@@ -45,65 +45,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         match raw_tx.transaction_type {
             RawTransactionType::Deposit => {
-                eprintln!("Found a deposit with ID {}.", raw_tx.transaction_id);
-
-                let amount = convert_fractional_to_number(
-                    raw_tx.amount.expect("Deposit/Withdrawal must have amount"),
-                );
-
-                let client = clients
-                    .entry(raw_tx.client_id)
-                    .or_insert(Client::new(raw_tx.client_id));
-
-                client.deposit(amount);
-
-                if transactions.contains_key(&raw_tx.transaction_id) {
-                    // I want to ignore them because overwriting
-                    // would mean we lose any effects we've previously applied.
-                    eprintln!(
-                        "Ignoring duplicate transaction ID {}",
-                        raw_tx.transaction_id
-                    );
-                } else {
-                    let transaction = ProcessedTransaction::new(
-                        raw_tx.transaction_id,
-                        raw_tx.client_id,
-                        amount,
-                        ProcessedTransactionType::Deposit,
-                    );
-
-                    transactions.insert(raw_tx.transaction_id, transaction);
-                }
+                handle_deposit(&raw_tx, &mut transactions, &mut clients);
             }
             RawTransactionType::Withdrawal => {
-                eprintln!("Found a withdrawal with ID {}.", raw_tx.transaction_id);
-
-                let amount = convert_fractional_to_number(
-                    raw_tx.amount.expect("Deposit/Withdrawal must have amount"),
-                );
-
-                let client = clients
-                    .entry(raw_tx.client_id)
-                    .or_insert(Client::new(raw_tx.client_id));
-
-                client.withdraw(amount);
-
-                if transactions.contains_key(&raw_tx.transaction_id) {
-                    // I want to ignore them because overwriting
-                    // would mean we lose any effects we've previously applied.
-                    eprintln!(
-                        "Ignoring duplicate transaction ID {}",
-                        raw_tx.transaction_id
-                    );
-                } else {
-                    let transaction = ProcessedTransaction::new(
-                        raw_tx.transaction_id,
-                        raw_tx.client_id,
-                        amount,
-                        ProcessedTransactionType::Withdrawal,
-                    );
-                    transactions.insert(raw_tx.transaction_id, transaction);
-                }
+                handle_withdrawal(&raw_tx, &mut transactions, &mut clients);
             }
             RawTransactionType::Dispute
             | RawTransactionType::Resolve
@@ -117,4 +62,95 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
+}
+
+/// Takes in a raw transaction that should be a deposit,
+/// a mutable reference to a hashmap of transactions,
+/// and a mutable reference to a hashmap of clients.
+/// Modifies the hash maps to reflect the deposit.
+///
+/// Not the most testable or functional function. I don't love it
+/// but I'd rather move fast and we can test at the "integration" layer.
+fn handle_deposit(
+    raw_tx: &RawTransaction,
+    transactions: &mut HashMap<u32, ProcessedTransaction>,
+    clients: &mut HashMap<u16, Client>,
+) {
+    if raw_tx.transaction_type != RawTransactionType::Deposit {
+        panic!("You should never pass an invalid transaction type to handle_deposit")
+    }
+
+    eprintln!("Found a deposit with ID {}.", raw_tx.transaction_id);
+
+    let amount =
+        convert_fractional_to_number(raw_tx.amount.expect("Deposit/Withdrawal must have amount"));
+
+    let client = clients
+        .entry(raw_tx.client_id)
+        .or_insert(Client::new(raw_tx.client_id));
+
+    client.deposit(amount);
+
+    if transactions.contains_key(&raw_tx.transaction_id) {
+        // I want to ignore them because overwriting
+        // would mean we lose any effects we've previously applied.
+        eprintln!(
+            "Ignoring duplicate transaction ID {}",
+            raw_tx.transaction_id
+        );
+    } else {
+        let transaction = ProcessedTransaction::new(
+            raw_tx.transaction_id,
+            raw_tx.client_id,
+            amount,
+            ProcessedTransactionType::Deposit,
+        );
+
+        transactions.insert(raw_tx.transaction_id, transaction);
+    }
+}
+
+/// Takes in a raw transaction that should be a withdrawal,
+/// a mutable reference to a hashmap of transactions,
+/// and a mutable reference to a hashmap of clients.
+/// Modifies the hash maps to reflect the deposit.
+///
+/// Not the most testable or functional function. I don't love it
+/// but I'd rather move fast and we can test at the "integration" layer.
+fn handle_withdrawal(
+    raw_tx: &RawTransaction,
+    transactions: &mut HashMap<u32, ProcessedTransaction>,
+    clients: &mut HashMap<u16, Client>,
+) {
+    if raw_tx.transaction_type != RawTransactionType::Withdrawal {
+        panic!("You should never pass an invalid transaction type to handle_withdrawal")
+    }
+
+    eprintln!("Found a withdrawal with ID {}.", raw_tx.transaction_id);
+
+    let amount =
+        convert_fractional_to_number(raw_tx.amount.expect("Deposit/Withdrawal must have amount"));
+
+    let client = clients
+        .entry(raw_tx.client_id)
+        .or_insert(Client::new(raw_tx.client_id));
+
+    client.withdraw(amount);
+
+    if transactions.contains_key(&raw_tx.transaction_id) {
+        // I want to ignore them because overwriting
+        // would mean we lose any effects we've previously applied.
+        eprintln!(
+            "Ignoring duplicate transaction ID {}",
+            raw_tx.transaction_id
+        );
+    } else {
+        let transaction = ProcessedTransaction::new(
+            raw_tx.transaction_id,
+            raw_tx.client_id,
+            amount,
+            ProcessedTransactionType::Withdrawal,
+        );
+        transactions.insert(raw_tx.transaction_id, transaction);
+    }
 }
