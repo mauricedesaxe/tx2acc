@@ -57,14 +57,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 client.deposit(amount);
 
-                let transaction = ProcessedTransaction::new(
-                    raw_tx.transaction_id,
-                    raw_tx.client_id,
-                    amount,
-                    ProcessedTransactionType::Deposit,
-                );
-                // I am assuming the CSV will never feed me duplicates
-                transactions.insert(raw_tx.transaction_id, transaction);
+                if transactions.contains_key(&raw_tx.transaction_id) {
+                    // I want to ignore them because overwriting
+                    // would mean we lose any effects we've previously applied.
+                    eprintln!(
+                        "Ignoring duplicate transaction ID {}",
+                        raw_tx.transaction_id
+                    );
+                } else {
+                    let transaction = ProcessedTransaction::new(
+                        raw_tx.transaction_id,
+                        raw_tx.client_id,
+                        amount,
+                        ProcessedTransactionType::Deposit,
+                    );
+
+                    transactions.insert(raw_tx.transaction_id, transaction);
+                }
             }
             RawTransactionType::Withdrawal => {
                 eprintln!("Found a withdrawal with ID {}.", raw_tx.transaction_id);
@@ -79,14 +88,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 client.withdraw(amount);
 
-                let transaction = ProcessedTransaction::new(
-                    raw_tx.transaction_id,
-                    raw_tx.client_id,
-                    amount,
-                    ProcessedTransactionType::Withdrawal,
-                );
-                // I am assuming the CSV will never feed me duplicates
-                transactions.insert(raw_tx.transaction_id, transaction);
+                if transactions.contains_key(&raw_tx.transaction_id) {
+                    // I want to ignore them because overwriting
+                    // would mean we lose any effects we've previously applied.
+                    eprintln!(
+                        "Ignoring duplicate transaction ID {}",
+                        raw_tx.transaction_id
+                    );
+                } else {
+                    let transaction = ProcessedTransaction::new(
+                        raw_tx.transaction_id,
+                        raw_tx.client_id,
+                        amount,
+                        ProcessedTransactionType::Withdrawal,
+                    );
+                    transactions.insert(raw_tx.transaction_id, transaction);
+                }
             }
             RawTransactionType::Dispute
             | RawTransactionType::Resolve
