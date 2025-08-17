@@ -6,7 +6,7 @@ mod raw_transaction;
 use client::Client;
 use convert::convert_fractional_to_number;
 use processed_transaction::{ProcessedTransaction, ProcessedTransactionType};
-use raw_transaction::RawTransaction;
+use raw_transaction::{RawTransaction, RawTransactionType};
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("CSV Row {}, {:?}", row, raw_tx);
 
         match raw_tx.transaction_type {
-            raw_transaction::RawTransactionType::Deposit => {
+            RawTransactionType::Deposit => {
                 eprintln!("Found a deposit with ID {}.", raw_tx.transaction_id);
 
                 let amount = convert_fractional_to_number(
@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // I am assuming the CSV will never feed me duplicates
                 transactions.insert(raw_tx.transaction_id, transaction);
             }
-            raw_transaction::RawTransactionType::Withdrawal => {
+            RawTransactionType::Withdrawal => {
                 eprintln!("Found a withdrawal with ID {}.", raw_tx.transaction_id);
 
                 let amount = convert_fractional_to_number(
@@ -88,9 +88,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // I am assuming the CSV will never feed me duplicates
                 transactions.insert(raw_tx.transaction_id, transaction);
             }
-            raw_transaction::RawTransactionType::Dispute
-            | raw_transaction::RawTransactionType::Resolve
-            | raw_transaction::RawTransactionType::Chargeback => {
+            RawTransactionType::Dispute
+            | RawTransactionType::Resolve
+            | RawTransactionType::Chargeback => {
                 eprintln!(
                     "Found an effect for transaction with ID {}.",
                     raw_tx.transaction_id
