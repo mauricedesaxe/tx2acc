@@ -87,6 +87,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // out here.
                 match raw_tx.transaction_type {
                     RawTransactionType::Dispute => {
+                        // I know unwrap is discouraged cause it can panic, but we
+                        // just checked that the this exists
                         let tx = transactions.get_mut(&raw_tx.transaction_id).unwrap();
 
                         if tx.dispute_status != DisputeStatus::Valid {
@@ -98,8 +100,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             );
                             continue;
                         }
+
+                        tx.dispute_status = DisputeStatus::Disputed;
+
+                        // I know unwrap is discouraged cause it can panic, but we
+                        // just checked that the this exists
+                        let client = clients.get_mut(&tx.client_id).unwrap();
+                        client.available -= tx.amount;
+                        client.held += tx.amount;
                     }
                     RawTransactionType::Resolve => {
+                        // I know unwrap is discouraged cause it can panic, but we
+                        // just checked that the this exists
                         let tx = transactions.get_mut(&raw_tx.transaction_id).unwrap();
 
                         if tx.dispute_status != DisputeStatus::Disputed {
@@ -110,8 +122,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             );
                             continue;
                         }
+
+                        tx.dispute_status = DisputeStatus::Resolved;
+
+                        // I know unwrap is discouraged cause it can panic, but we
+                        // just checked that the this exists
+                        let client = clients.get_mut(&tx.client_id).unwrap();
+                        client.available += tx.amount;
+                        client.held -= tx.amount;
                     }
                     RawTransactionType::Chargeback => {
+                        // I know unwrap is discouraged cause it can panic, but we
+                        // just checked that the this exists
                         let tx = transactions.get_mut(&raw_tx.transaction_id).unwrap();
 
                         if tx.dispute_status != DisputeStatus::Disputed {
@@ -122,6 +144,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             );
                             continue;
                         }
+
+                        tx.dispute_status = DisputeStatus::ChargedBack;
+
+                        // I know unwrap is discouraged cause it can panic, but we
+                        // just checked that the this exists
+                        let client = clients.get_mut(&tx.client_id).unwrap();
+                        client.held -= tx.amount;
+                        client.total -= tx.amount;
+                        client.locked = true;
                     }
                     _ => {
                         eprintln!("Unreachable since I've already handled deposit/withdraw.");

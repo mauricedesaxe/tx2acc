@@ -1,10 +1,10 @@
 #[derive(Debug, Clone)]
 pub struct Client {
     client_id: u16,
-    available: u64,
-    held: u64,
-    total: u64,
-    locked: bool,
+    pub available: u64,
+    pub held: u64,
+    pub total: u64,
+    pub locked: bool,
 }
 
 impl Client {
