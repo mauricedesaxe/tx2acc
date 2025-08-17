@@ -1,9 +1,11 @@
+mod client;
 mod types;
+use client::Client;
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::path::Path;
-use types::{Client, ProcessedTransaction, RawTransaction};
+use types::{ProcessedTransaction, RawTransaction};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
