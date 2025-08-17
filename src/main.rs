@@ -57,6 +57,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "Found an effect for transaction with ID {}.",
                     raw_tx.transaction_id
                 );
+
+                if !clients.contains_key(&raw_tx.client_id) {
+                    // This is an easy skip, if the client doesn't exist it means a transaction
+                    // doesn't exist so the effect cannot be applied.
+                    // This is safe because the transactions are fed to the system chronologically
+                    // so a client should exist if they had a transaction before.
+                    eprintln!(
+                        "Client with ID {} not found while handling effect for tx {}.",
+                        raw_tx.client_id, raw_tx.transaction_id
+                    );
+                    continue;
+                }
+
+                if !transactions.contains_key(&raw_tx.transaction_id) {
+                    // This is also an easy skip, if the transaction doesn't exist it means a transaction
+                    // doesn't exist so the effect cannot be applied.
+                    // This is safe because the transactions are fed to the system chronologically
+                    // so the transaction should exist if an effect came in from the CSV.
+                    eprintln!(
+                        "Transaction with ID {} not found while handling effect for tx {}.",
+                        raw_tx.transaction_id, raw_tx.transaction_id
+                    );
+                    continue;
+                }
             }
         }
     }
