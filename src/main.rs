@@ -5,7 +5,7 @@ mod raw_transaction;
 
 use client::Client;
 use convert::convert_fractional_to_number;
-use processed_transaction::{ProcessedTransaction, ProcessedTransactionType};
+use processed_transaction::{DisputeStatus, ProcessedTransaction, ProcessedTransactionType};
 use raw_transaction::{RawTransaction, RawTransactionType};
 use std::collections::HashMap;
 use std::env;
@@ -80,6 +80,52 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         raw_tx.transaction_id, raw_tx.transaction_id
                     );
                     continue;
+                }
+
+                // A match in a match is certainly an anti-pattern, ugly and over-nested.
+                // I don't like it, but I'll improve later. Now I just want to get the core flows
+                // out here.
+                match raw_tx.transaction_type {
+                    RawTransactionType::Dispute => {
+                        let tx = transactions.get_mut(&raw_tx.transaction_id).unwrap();
+
+                        if tx.dispute_status != DisputeStatus::Valid {
+                            // We're not supposed to re-dispute a transaction that's already disputed
+                            // or is resolved/chargedback.
+                            eprintln!(
+                                "Failed to dispute transaction with ID {} because it is not valid.",
+                                raw_tx.transaction_id
+                            );
+                            continue;
+                        }
+                    }
+                    RawTransactionType::Resolve => {
+                        let tx = transactions.get_mut(&raw_tx.transaction_id).unwrap();
+
+                        if tx.dispute_status != DisputeStatus::Disputed {
+                            // We're not supposed to resolve a transaction that's not disputed.
+                            eprintln!(
+                                "Failed to resolve transaction with ID {} because it is not disputed.",
+                                raw_tx.transaction_id
+                            );
+                            continue;
+                        }
+                    }
+                    RawTransactionType::Chargeback => {
+                        let tx = transactions.get_mut(&raw_tx.transaction_id).unwrap();
+
+                        if tx.dispute_status != DisputeStatus::Disputed {
+                            // We're not supposed to chargeback a transaction that's not disputed.
+                            eprintln!(
+                                "Failed to chargeback transaction with ID {} because it is not disputed.",
+                                raw_tx.transaction_id
+                            );
+                            continue;
+                        }
+                    }
+                    _ => {
+                        eprintln!("Unreachable since I've already handled deposit/withdraw.");
+                    }
                 }
             }
         }

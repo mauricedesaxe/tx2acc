@@ -4,7 +4,7 @@ pub enum ProcessedTransactionType {
     Withdrawal,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DisputeStatus {
     Valid,
     Disputed,
@@ -14,11 +14,11 @@ pub enum DisputeStatus {
 
 #[derive(Debug, Clone)]
 pub struct ProcessedTransaction {
-    transaction_type: ProcessedTransactionType,
-    dispute_status: DisputeStatus,
-    client_id: u16,
-    transaction_id: u32,
-    amount: u64,
+    pub transaction_type: ProcessedTransactionType,
+    pub dispute_status: DisputeStatus,
+    pub client_id: u16,
+    pub transaction_id: u32,
+    pub amount: u64,
 }
 
 impl ProcessedTransaction {
