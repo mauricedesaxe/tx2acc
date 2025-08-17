@@ -1,16 +1,16 @@
 mod client;
 mod convert;
 mod processed_transaction;
-mod types;
+mod raw_transaction;
 
 use client::Client;
 use convert::convert_fractional_to_number;
 use processed_transaction::{ProcessedTransaction, ProcessedTransactionType};
+use raw_transaction::RawTransaction;
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::path::Path;
-use types::RawTransaction;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("CSV Row {}, {:?}", row, raw_tx);
 
         match raw_tx.transaction_type {
-            types::RawTransactionType::Deposit => {
+            raw_transaction::RawTransactionType::Deposit => {
                 eprintln!("Found a deposit with ID {}.", raw_tx.transaction_id);
 
                 let amount = convert_fractional_to_number(
@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // I am assuming the CSV will never feed me duplicates
                 transactions.insert(raw_tx.transaction_id, transaction);
             }
-            types::RawTransactionType::Withdrawal => {
+            raw_transaction::RawTransactionType::Withdrawal => {
                 eprintln!("Found a withdrawal with ID {}.", raw_tx.transaction_id);
 
                 let amount = convert_fractional_to_number(
@@ -88,9 +88,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // I am assuming the CSV will never feed me duplicates
                 transactions.insert(raw_tx.transaction_id, transaction);
             }
-            types::RawTransactionType::Dispute
-            | types::RawTransactionType::Resolve
-            | types::RawTransactionType::Chargeback => {
+            raw_transaction::RawTransactionType::Dispute
+            | raw_transaction::RawTransactionType::Resolve
+            | raw_transaction::RawTransactionType::Chargeback => {
                 eprintln!(
                     "Found an effect for transaction with ID {}.",
                     raw_tx.transaction_id
