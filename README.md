@@ -1,5 +1,15 @@
 # Transactions to Accounts Converter
 
+## Next steps
+
+I'd love to add some automated tests to make sure everything works as I expect it.
+
+I'd love to take some more time to refactor the handlers in `main.rs` as they have
+quite some duplication.
+
+I'd love to add a profiler and consider concurrency/parallelism & the sorting approach
+I outlined below to make this more performant.
+
 ## Approach
 
 ### For starters, I'll avoid optimizing for performance through concurrency/parallelism.
