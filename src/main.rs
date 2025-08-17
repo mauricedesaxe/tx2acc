@@ -1,14 +1,16 @@
 mod client;
 mod convert;
+mod processed_transaction;
 mod types;
 
 use client::Client;
 use convert::convert_fractional_to_number;
+use processed_transaction::{ProcessedTransaction, ProcessedTransactionType};
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::path::Path;
-use types::{ProcessedTransaction, RawTransaction};
+use types::RawTransaction;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -59,7 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     raw_tx.transaction_id,
                     raw_tx.client_id,
                     amount,
-                    types::ProcessedTransactionType::Deposit,
+                    ProcessedTransactionType::Deposit,
                 );
                 // I am assuming the CSV will never feed me duplicates
                 transactions.insert(raw_tx.transaction_id, transaction);
@@ -81,7 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     raw_tx.transaction_id,
                     raw_tx.client_id,
                     amount,
-                    types::ProcessedTransactionType::Withdrawal,
+                    ProcessedTransactionType::Withdrawal,
                 );
                 // I am assuming the CSV will never feed me duplicates
                 transactions.insert(raw_tx.transaction_id, transaction);
