@@ -1,5 +1,6 @@
 mod client;
 mod types;
+
 use client::Client;
 use std::collections::HashMap;
 use std::env;
