@@ -54,6 +54,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .or_insert(Client::new(raw_tx.client_id));
 
                 client.deposit(amount);
+
+                let transaction = ProcessedTransaction::new(
+                    raw_tx.transaction_id,
+                    raw_tx.client_id,
+                    amount,
+                    types::ProcessedTransactionType::Deposit,
+                );
+                // I am assuming the CSV will never feed me duplicates
+                transactions.insert(raw_tx.transaction_id, transaction);
             }
             types::RawTransactionType::Withdrawal => {
                 eprintln!("Found a withdrawal with ID {}.", raw_tx.transaction_id);
@@ -67,6 +76,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .or_insert(Client::new(raw_tx.client_id));
 
                 client.withdraw(amount);
+
+                let transaction = ProcessedTransaction::new(
+                    raw_tx.transaction_id,
+                    raw_tx.client_id,
+                    amount,
+                    types::ProcessedTransactionType::Withdrawal,
+                );
+                // I am assuming the CSV will never feed me duplicates
+                transactions.insert(raw_tx.transaction_id, transaction);
             }
             types::RawTransactionType::Dispute
             | types::RawTransactionType::Resolve

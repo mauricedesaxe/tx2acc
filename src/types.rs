@@ -43,3 +43,20 @@ pub struct ProcessedTransaction {
     transaction_id: u32,
     amount: u64,
 }
+
+impl ProcessedTransaction {
+    pub fn new(
+        transaction_id: u32,
+        client_id: u16,
+        amount: u64,
+        transaction_type: ProcessedTransactionType,
+    ) -> Self {
+        Self {
+            transaction_id,
+            client_id,
+            transaction_type,
+            amount,
+            dispute_status: DisputeStatus::Valid,
+        }
+    }
+}
