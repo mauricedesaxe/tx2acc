@@ -50,114 +50,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             RawTransactionType::Withdrawal => {
                 handle_withdrawal(&raw_tx, &mut transactions, &mut clients);
             }
-            RawTransactionType::Dispute
-            | RawTransactionType::Resolve
-            | RawTransactionType::Chargeback => {
-                eprintln!(
-                    "Found an effect for transaction with ID {}.",
-                    raw_tx.transaction_id
-                );
-
-                if !clients.contains_key(&raw_tx.client_id) {
-                    // This is an easy skip, if the client doesn't exist it means a transaction
-                    // doesn't exist so the effect cannot be applied.
-                    // This is safe because the transactions are fed to the system chronologically
-                    // so a client should exist if they had a transaction before.
-                    eprintln!(
-                        "Client with ID {} not found while handling effect for tx {}.",
-                        raw_tx.client_id, raw_tx.transaction_id
-                    );
-                    continue;
-                }
-
-                if !transactions.contains_key(&raw_tx.transaction_id) {
-                    // This is also an easy skip, if the transaction doesn't exist it means a transaction
-                    // doesn't exist so the effect cannot be applied.
-                    // This is safe because the transactions are fed to the system chronologically
-                    // so the transaction should exist if an effect came in from the CSV.
-                    eprintln!(
-                        "Transaction with ID {} not found while handling effect for tx {}.",
-                        raw_tx.transaction_id, raw_tx.transaction_id
-                    );
-                    continue;
-                }
-
-                // A match in a match is certainly an anti-pattern, ugly and over-nested.
-                // I don't like it, but I'll improve later. Now I just want to get the core flows
-                // out here.
-                match raw_tx.transaction_type {
-                    RawTransactionType::Dispute => {
-                        // I know unwrap is discouraged cause it can panic, but we
-                        // just checked that the this exists
-                        let tx = transactions.get_mut(&raw_tx.transaction_id).unwrap();
-
-                        if tx.dispute_status != DisputeStatus::Valid {
-                            // We're not supposed to re-dispute a transaction that's already disputed
-                            // or is resolved/chargedback.
-                            eprintln!(
-                                "Failed to dispute transaction with ID {} because it is not valid.",
-                                raw_tx.transaction_id
-                            );
-                            continue;
-                        }
-
-                        tx.dispute_status = DisputeStatus::Disputed;
-
-                        // I know unwrap is discouraged cause it can panic, but we
-                        // just checked that the this exists
-                        let client = clients.get_mut(&tx.client_id).unwrap();
-                        client.available -= tx.amount;
-                        client.held += tx.amount;
-                    }
-                    RawTransactionType::Resolve => {
-                        // I know unwrap is discouraged cause it can panic, but we
-                        // just checked that the this exists
-                        let tx = transactions.get_mut(&raw_tx.transaction_id).unwrap();
-
-                        if tx.dispute_status != DisputeStatus::Disputed {
-                            // We're not supposed to resolve a transaction that's not disputed.
-                            eprintln!(
-                                "Failed to resolve transaction with ID {} because it is not disputed.",
-                                raw_tx.transaction_id
-                            );
-                            continue;
-                        }
-
-                        tx.dispute_status = DisputeStatus::Resolved;
-
-                        // I know unwrap is discouraged cause it can panic, but we
-                        // just checked that the this exists
-                        let client = clients.get_mut(&tx.client_id).unwrap();
-                        client.available += tx.amount;
-                        client.held -= tx.amount;
-                    }
-                    RawTransactionType::Chargeback => {
-                        // I know unwrap is discouraged cause it can panic, but we
-                        // just checked that the this exists
-                        let tx = transactions.get_mut(&raw_tx.transaction_id).unwrap();
-
-                        if tx.dispute_status != DisputeStatus::Disputed {
-                            // We're not supposed to chargeback a transaction that's not disputed.
-                            eprintln!(
-                                "Failed to chargeback transaction with ID {} because it is not disputed.",
-                                raw_tx.transaction_id
-                            );
-                            continue;
-                        }
-
-                        tx.dispute_status = DisputeStatus::ChargedBack;
-
-                        // I know unwrap is discouraged cause it can panic, but we
-                        // just checked that the this exists
-                        let client = clients.get_mut(&tx.client_id).unwrap();
-                        client.held -= tx.amount;
-                        client.total -= tx.amount;
-                        client.locked = true;
-                    }
-                    _ => {
-                        eprintln!("Unreachable since I've already handled deposit/withdraw.");
-                    }
-                }
+            RawTransactionType::Dispute => {
+                handle_dispute(&raw_tx, &mut transactions, &mut clients);
+            }
+            RawTransactionType::Resolve => {
+                handle_resolve(&raw_tx, &mut transactions, &mut clients);
+            }
+            RawTransactionType::Chargeback => {
+                handle_chargeback(&raw_tx, &mut transactions, &mut clients);
             }
         }
     }
@@ -254,4 +154,182 @@ fn handle_withdrawal(
         );
         transactions.insert(raw_tx.transaction_id, transaction);
     }
+}
+
+fn handle_dispute(
+    raw_tx: &RawTransaction,
+    transactions: &mut HashMap<u32, ProcessedTransaction>,
+    clients: &mut HashMap<u16, Client>,
+) {
+    if raw_tx.transaction_type != RawTransactionType::Dispute {
+        panic!("You should never pass an invalid transaction type to handle_dispute")
+    }
+
+    eprintln!(
+        "Found a dispute for transaction with ID {}.",
+        raw_tx.transaction_id
+    );
+
+    if !clients.contains_key(&raw_tx.client_id) {
+        // This is an easy skip, if the client doesn't exist it means a transaction
+        // doesn't exist so the effect cannot be applied.
+        // This is safe because the transactions are fed to the system chronologically
+        // so a client should exist if they had a transaction before.
+        eprintln!(
+            "Client with ID {} not found while handling effect for tx {}.",
+            raw_tx.client_id, raw_tx.transaction_id
+        );
+        return;
+    }
+
+    if !transactions.contains_key(&raw_tx.transaction_id) {
+        // This is also an easy skip, if the transaction doesn't exist it means a transaction
+        // doesn't exist so the effect cannot be applied.
+        // This is safe because the transactions are fed to the system chronologically
+        // so the transaction should exist if an effect came in from the CSV.
+        eprintln!(
+            "Transaction with ID {} not found while handling effect for tx {}.",
+            raw_tx.transaction_id, raw_tx.transaction_id
+        );
+        return;
+    }
+
+    // I know unwrap is discouraged cause it can panic, but we
+    // just checked that the transaction exists
+    let tx = transactions.get_mut(&raw_tx.transaction_id).unwrap();
+
+    if tx.dispute_status != DisputeStatus::Valid {
+        eprintln!(
+            "Failed to dispute transaction with ID {} because it is not valid.",
+            raw_tx.transaction_id
+        );
+        return;
+    }
+
+    tx.dispute_status = DisputeStatus::Disputed;
+
+    // I know unwrap is discouraged cause it can panic, but we
+    // just checked that the client exists
+    let client = clients.get_mut(&tx.client_id).unwrap();
+    client.available -= tx.amount;
+    client.held += tx.amount;
+}
+
+fn handle_resolve(
+    raw_tx: &RawTransaction,
+    transactions: &mut HashMap<u32, ProcessedTransaction>,
+    clients: &mut HashMap<u16, Client>,
+) {
+    if raw_tx.transaction_type != RawTransactionType::Resolve {
+        panic!("You should never pass an invalid transaction type to handle_resolve")
+    }
+
+    eprintln!(
+        "Found a resolve for transaction with ID {}.",
+        raw_tx.transaction_id
+    );
+
+    if !clients.contains_key(&raw_tx.client_id) {
+        // This is an easy skip, if the client doesn't exist it means a transaction
+        // doesn't exist so the effect cannot be applied.
+        // This is safe because the transactions are fed to the system chronologically
+        // so a client should exist if they had a transaction before.
+        eprintln!(
+            "Client with ID {} not found while handling effect for tx {}.",
+            raw_tx.client_id, raw_tx.transaction_id
+        );
+        return;
+    }
+
+    if !transactions.contains_key(&raw_tx.transaction_id) {
+        // This is also an easy skip, if the transaction doesn't exist it means a transaction
+        // doesn't exist so the effect cannot be applied.
+        // This is safe because the transactions are fed to the system chronologically
+        // so the transaction should exist if an effect came in from the CSV.
+        eprintln!(
+            "Transaction with ID {} not found while handling effect for tx {}.",
+            raw_tx.transaction_id, raw_tx.transaction_id
+        );
+        return;
+    }
+
+    // I know unwrap is discouraged cause it can panic, but we
+    // just checked that the transaction exists
+    let tx = transactions.get_mut(&raw_tx.transaction_id).unwrap();
+
+    if tx.dispute_status != DisputeStatus::Disputed {
+        eprintln!(
+            "Failed to resolve transaction with ID {} because it is not disputed.",
+            raw_tx.transaction_id
+        );
+        return;
+    }
+
+    tx.dispute_status = DisputeStatus::Resolved;
+
+    // I know unwrap is discouraged cause it can panic, but we
+    // just checked that the client exists
+    let client = clients.get_mut(&tx.client_id).unwrap();
+    client.available += tx.amount;
+    client.held -= tx.amount;
+}
+
+fn handle_chargeback(
+    raw_tx: &RawTransaction,
+    transactions: &mut HashMap<u32, ProcessedTransaction>,
+    clients: &mut HashMap<u16, Client>,
+) {
+    if raw_tx.transaction_type != RawTransactionType::Chargeback {
+        panic!("You should never pass an invalid transaction type to handle_chargeback")
+    }
+
+    eprintln!(
+        "Found a chargeback for transaction with ID {}.",
+        raw_tx.transaction_id
+    );
+
+    if !clients.contains_key(&raw_tx.client_id) {
+        // This is an easy skip, if the client doesn't exist it means a transaction
+        // doesn't exist so the effect cannot be applied.
+        // This is safe because the transactions are fed to the system chronologically
+        // so a client should exist if they had a transaction before.
+        eprintln!(
+            "Client with ID {} not found while handling effect for tx {}.",
+            raw_tx.client_id, raw_tx.transaction_id
+        );
+        return;
+    }
+
+    if !transactions.contains_key(&raw_tx.transaction_id) {
+        // This is also an easy skip, if the transaction doesn't exist it means a transaction
+        // doesn't exist so the effect cannot be applied.
+        // This is safe because the transactions are fed to the system chronologically
+        // so the transaction should exist if an effect came in from the CSV.
+        eprintln!(
+            "Transaction with ID {} not found while handling effect for tx {}.",
+            raw_tx.transaction_id, raw_tx.transaction_id
+        );
+        return;
+    }
+
+    // I know unwrap is discouraged cause it can panic, but we
+    // just checked that the transaction exists
+    let tx = transactions.get_mut(&raw_tx.transaction_id).unwrap();
+
+    if tx.dispute_status != DisputeStatus::Disputed {
+        eprintln!(
+            "Failed to chargeback transaction with ID {} because it is not disputed.",
+            raw_tx.transaction_id
+        );
+        return;
+    }
+
+    tx.dispute_status = DisputeStatus::ChargedBack;
+
+    // I know unwrap is discouraged cause it can panic, but we
+    // just checked that the client exists
+    let client = clients.get_mut(&tx.client_id).unwrap();
+    client.held -= tx.amount;
+    client.total -= tx.amount;
+    client.locked = true;
 }
