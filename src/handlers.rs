@@ -517,4 +517,95 @@ mod tests {
 
         assert_eq!(transactions.len(), 9);
     }
+
+    #[test]
+    fn test_locked_account_rejects_operations() {
+        let mut transactions: HashMap<u32, ProcessedTransaction> = HashMap::new();
+        let mut clients: HashMap<u16, Client> = HashMap::new();
+
+        let initial_transactions = vec![
+            RawTransaction {
+                transaction_type: RawTransactionType::Deposit,
+                client_id: 1,
+                transaction_id: 1,
+                amount: Some(1000.0),
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Dispute,
+                client_id: 1,
+                transaction_id: 1,
+                amount: None,
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Chargeback,
+                client_id: 1,
+                transaction_id: 1,
+                amount: None,
+            },
+        ];
+
+        for raw_tx in &initial_transactions {
+            handle_transaction(raw_tx, &mut transactions, &mut clients);
+        }
+
+        let client = clients.get(&1).unwrap();
+        assert_eq!(client.locked, true);
+
+        let available_before = client.available;
+        let held_before = client.held;
+        let total_before = client.total;
+        let tx_count_before = transactions.len();
+
+        let forbidden_transactions = vec![
+            RawTransaction {
+                transaction_type: RawTransactionType::Deposit,
+                client_id: 1,
+                transaction_id: 2,
+                amount: Some(500.0),
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Withdrawal,
+                client_id: 1,
+                transaction_id: 3,
+                amount: Some(100.0),
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Dispute,
+                client_id: 1,
+                transaction_id: 1,
+                amount: None,
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Resolve,
+                client_id: 1,
+                transaction_id: 1,
+                amount: None,
+            },
+        ];
+
+        for raw_tx in &forbidden_transactions {
+            handle_transaction(raw_tx, &mut transactions, &mut clients);
+        }
+
+        let client_after = clients.get(&1).unwrap();
+        assert_eq!(
+            client_after.available, available_before,
+            "Available balance changed on locked account"
+        );
+        assert_eq!(
+            client_after.held, held_before,
+            "Held balance changed on locked account"
+        );
+        assert_eq!(
+            client_after.total, total_before,
+            "Total balance changed on locked account"
+        );
+        assert_eq!(client_after.locked, true, "Account should still be locked");
+
+        assert_eq!(
+            transactions.len(),
+            tx_count_before,
+            "Forbidden transactions were processed when they should have been rejected"
+        );
+    }
 }
