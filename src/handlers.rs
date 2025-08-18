@@ -652,4 +652,49 @@ mod tests {
             "Forbidden transactions were processed when they should have been rejected"
         );
     }
+
+    #[test]
+    fn test_cross_client_effects() {
+        let mut transactions: HashMap<u32, ProcessedTransaction> = HashMap::new();
+        let mut clients: HashMap<u16, Client> = HashMap::new();
+
+        let deposit_tx = RawTransaction {
+            transaction_type: RawTransactionType::Deposit,
+            client_id: 1,
+            transaction_id: 1,
+            amount: Some(100.0),
+        };
+        handle_transaction(&deposit_tx, &mut transactions, &mut clients);
+
+        let deposit_tx2 = RawTransaction {
+            transaction_type: RawTransactionType::Deposit,
+            client_id: 2,
+            transaction_id: 2,
+            amount: Some(50.0),
+        };
+        handle_transaction(&deposit_tx2, &mut transactions, &mut clients);
+
+        let client1_initial_available = clients.get(&1).unwrap().available;
+        let client1_initial_held = clients.get(&1).unwrap().held;
+        let client2_initial_available = clients.get(&2).unwrap().available;
+        let client2_initial_held = clients.get(&2).unwrap().held;
+
+        let dispute_tx = RawTransaction {
+            transaction_type: RawTransactionType::Dispute,
+            client_id: 2,
+            transaction_id: 1, // This is client 1's transaction
+            amount: None,
+        };
+        handle_transaction(&dispute_tx, &mut transactions, &mut clients);
+
+        let client1_after = clients.get(&1).unwrap();
+        let client2_after = clients.get(&2).unwrap();
+
+        // Both should be unchanged since cross-client effects shouldn't apply
+        assert_eq!(client1_after.available, client1_initial_available);
+        assert_eq!(client1_after.held, client1_initial_held);
+        assert_eq!(client1_after.total, client1_initial_available);
+        assert_eq!(client2_after.available, client2_initial_available);
+        assert_eq!(client2_after.held, client2_initial_held);
+    }
 }
