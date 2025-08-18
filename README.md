@@ -1,47 +1,59 @@
 # Transactions to Accounts Converter
 
-## Next steps
-
-I'd love to add some automated tests to make sure everything works as I expect it.
-
-I'd love to take some more time to refactor the handlers in `main.rs` as they have
-quite some duplication.
-
-I'd love to add a profiler and consider concurrency/parallelism & the sorting approach
-I outlined below to make this more performant.
-
-## Approach
-
-### For starters, I'll avoid optimizing for performance through concurrency/parallelism.
-
-I've researched the 1B row challenge for this.
-I've found they often do a number of optimizations like:
-- splitting rows by bytes instead of using Strings
-- using `crossbeam-channel` vs `std::sync::mpsc` as they are more feature rich and performant
-- using `hashbrown` instead of the `std::collections::HashMap` (again, more performant)
-
-If you read the approaches I've outlined, likely `crossbeam-channel` doesn't really
-apply to them as much. More likely, you might use a Mutex or RwLock on a HashMap.
-Or, maybe, you could use a `DashMap` from the `dashmap` crate (which allows us
-to "shard" the data in buckets for concurrent use).
-
-I won't do any of these optimizations for this take-home.
-I think a higher initial priority is making sure we correctly scan through
-the transactions to find and apply disputes/resolves/chargebacks correctly.
-
-### How should we tackle the `transaction -> dispute/resolution/chargeback` mapping?
-
 Note: for the sake of this discussion, I'll call disputes/resolves/chargebacks
 "effects" not "transactions".
 
-**TL;DR:** If you read below, you will understand the various approaches I've considered.
-In my decision to take the first approach presented, I've assumed:
-- You don't want me to prevent fraud
+## Table of Contents
+
+- [Testing strategy](#testing-strategy)
+- [How I've tackled the `transaction -> dispute/resolution/chargeback` mapping?](#how-ive-tackled-the-transaction---disputeresolutionchargeback-mapping)
+  - [If you don't want to prevent fraud...](#if-you-dont-want-to-prevent-fraud)
+  - [If you want to prevent fraud...](#if-you-want-to-prevent-fraud)
+- [Various performance optimizations I could do](#various-performance-optimizations-i-could-do)
+- [Other improvements I'd make](#other-improvements-id-make)
+- [AI Usage](#ai-usage)
+- [Background](#background-no-need-to-read-this-if-you-know-the-pdf-already)
+  - [Types of transactions](#types-of-transactions)
+  - [Other assumptions and notes](#other-assumptions-and-notes)
+
+## Testing strategy
+
+I focused on integration tests over unit tests. Rather than testing
+individual functions, I test the main `handle_transaction` function with
+(hopefully) realistic transaction sequences. This validates the complete flow
+from raw transactions through balance updates and ensures all edge cases
+work together correctly.
+
+Currently I've covered simple deposits and withdrawals, a more complex
+sequence with a mix of **effects** and whether we actually lock accounts.
+
+This is by no means all it could be. One could add edge case tests for negative/zero
+amount deposits, disputing a withdrawal, effects on non existent transactions,
+effects before the transaction exists, duplicate effects, integer overflow
+(someone depositing a huge amount which we then convert by `* 10000`).
+
+There are truly quite some edge cases I didn't have time to cover.
+For some of them, like "disputing a withdrawal", I haven't even
+clearly defined what behaviour I want to see to myself.
+
+I might also want to fuzz this and ensure some invariants are always true.
+
+**Why I chose integration testing?** The logic in my case is tightly
+coupled, I haven't coded very "functional" code, so this was easier
+than trying to test each function in isolation. It also is all encompassing
+and very similar to how you will test the system yourself.
+
+## How I've tackled the `transaction -> dispute/resolution/chargeback` mapping?
+
+In **my decision to take the first approach presented**, I've assumed:
+- You don't want me to prevent fraud of the `deposit -> withdraw -> chargeback the deposit` type
 - You want me to apply transactions and **effects** chronologically
 - The provided CSV will not be immense
-- I'd rather use more memory than disk I/O for speed and simplicity
-- Simpler is better for the sake of this take-home
+- You'd rather use more memory than disk I/O
+- Simpler is better
+
 I have though documented both how I could prevent fraud and reduce memory usage.
+Also, there are other (smaller?) assumptions that you can read below.
 
 I've spent quite some time thinking about this part.
 There is one key assumption that is, at this moment, messing with me.
@@ -55,7 +67,7 @@ If processed chronologically, we allow potential fraud.
 There is nowhere in the PDF that tells me to prevent this.
 But I have found a few ways to prevent it and I like some of those designs.
 
-#### If you don't want to prevent fraud...
+### If you don't want to prevent fraud...
 
 In this case you have to process transactions for each client as they are received
 from the initial CSV file, assumed chronologically.
@@ -84,7 +96,7 @@ you're done with the client.
 
 In the first way, you had to keep all clients in memory because you didn't know for a fact whether new transactions/**effects** for existent clients would come up later.
 
-#### If you want to prevent fraud...
+### If you want to prevent fraud...
 
 If you want to prevent the fraud, it's important to only apply transactions to
 balances once you've gone through all transactions and their **effects**.
@@ -120,7 +132,57 @@ You can flush them as soon as you are done with that `tx_id`.
 In the third approach, you had to keep all transactions in memory because you
 needed to make sure an **effect** doesn't come up later for a given `tx_id`.
 
-## Background (no need to read this if you know the PDF already)
+## Various performance optimizations I could do
+
+I've researched the 1B row challenge for this.
+I've found they often do a number of optimizations like:
+- splitting rows by bytes instead of using Strings
+- using `crossbeam-channel` vs `std::sync::mpsc` as they are more feature rich and performant
+- using `hashbrown` instead of the `std::collections::HashMap` (again, more performant)
+
+I'd personally not consider splitting rows by bytes.
+Too complex & error-prone for my liking.
+
+If you read the approaches I've outlined below, likely `crossbeam-channel` and channels
+in general don't apply as much.
+
+If I wanted to introduce concurrency, I might use a Mutex or RwLock on a HashMap.
+But that's problematic. I'm not sure how much performance gain I'd get since
+all operations touch those maps and you'd run into a lot of locking time.
+
+More likely, I could use a `DashMap` from the `dashmap` crate which allows us
+to "shard" the data in buckets for concurrent use. So one thread touches
+clients 1-100, another touches clients 101-200, etc and they don't step
+on each other's toes.
+
+Of course, maybe there's another way to design this that doesn't have HashMaps?
+So then maybe Mutex/RwLocks/channels make more sense.
+
+More importantly, I'd love to add a profiler before I implement either
+`DashMap` or the sorting approach outlined above. You can't improve
+what you don't measure.
+
+I haven't done any of these because of lack of time.
+
+## Other improvements I'd make
+
+I'd love to take some more time to refactor the handlers in `main.rs` as they have
+quite some duplication.
+
+I'd also take some time to fix those clippy errors and make CI pass.
+
+## AI Usage
+
+I have used AI (Claude, Zed, Perplexity, Copilot) throughout
+this assignment for various things like:
+- rubber ducking
+- boilerplate implementation (like for CSV streaming)
+- generation of samples & tests
+
+I still wrote most of the code, have obviously closely reviewed everything that
+was generated and fully own all of the code that got committed.
+
+## Background
 
 Takes in a CSV file similar to the ones in `data/tx`.
 These will contain transactions in the format of:
@@ -232,6 +294,8 @@ chargeback, 1, 1,
 - it's recommended that we stream values instead of loading the whole dataset as it may be large
 - code "cleanliness" is more important than performance in this exercise
 - unlike withdrawals which should be prevented, disputes are processed even if they would make the available balance negative.
+- duplicate transactions are to be ignored
+- clients shouldn't be able to dispute other clients' transactions
 
 When in doubt on how to interpret a requirement, try to make assumptions that make sense for
 a bank (think an ATM or more elaborate transaction processors), and document them.
