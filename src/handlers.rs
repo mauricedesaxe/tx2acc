@@ -375,4 +375,150 @@ mod tests {
         assert!(transactions.contains_key(&4));
         assert!(transactions.contains_key(&5));
     }
+
+    #[test]
+    fn test_handle_transaction_complex_data() {
+        let mut transactions: HashMap<u32, ProcessedTransaction> = HashMap::new();
+        let mut clients: HashMap<u16, Client> = HashMap::new();
+
+        let complex_transactions = vec![
+            RawTransaction {
+                transaction_type: RawTransactionType::Deposit,
+                client_id: 1,
+                transaction_id: 1,
+                amount: Some(1000.0),
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Deposit,
+                client_id: 2,
+                transaction_id: 4,
+                amount: Some(800.0),
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Deposit,
+                client_id: 3,
+                transaction_id: 7,
+                amount: Some(600.0),
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Deposit,
+                client_id: 1,
+                transaction_id: 2,
+                amount: Some(500.0),
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Deposit,
+                client_id: 2,
+                transaction_id: 5,
+                amount: Some(400.0),
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Deposit,
+                client_id: 3,
+                transaction_id: 8,
+                amount: Some(300.0),
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Withdrawal,
+                client_id: 1,
+                transaction_id: 3,
+                amount: Some(200.0),
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Withdrawal,
+                client_id: 2,
+                transaction_id: 6,
+                amount: Some(100.0),
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Withdrawal,
+                client_id: 3,
+                transaction_id: 9,
+                amount: Some(150.0),
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Dispute,
+                client_id: 1,
+                transaction_id: 1,
+                amount: None,
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Dispute,
+                client_id: 2,
+                transaction_id: 4,
+                amount: None,
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Dispute,
+                client_id: 3,
+                transaction_id: 7,
+                amount: None,
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Dispute,
+                client_id: 1,
+                transaction_id: 2,
+                amount: None,
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Dispute,
+                client_id: 3,
+                transaction_id: 8,
+                amount: None,
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Resolve,
+                client_id: 1,
+                transaction_id: 2,
+                amount: None,
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Resolve,
+                client_id: 3,
+                transaction_id: 7,
+                amount: None,
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Chargeback,
+                client_id: 2,
+                transaction_id: 4,
+                amount: None,
+            },
+        ];
+
+        for raw_tx in &complex_transactions {
+            handle_transaction(raw_tx, &mut transactions, &mut clients);
+        }
+
+        assert_eq!(clients.len(), 3);
+        assert!(clients.contains_key(&1));
+        assert!(clients.contains_key(&2));
+        assert!(clients.contains_key(&3));
+
+        // Client 1 has one unresolved dispute (tx1 = 1000 held), tx2 was resolved
+        // We expect: available=300, held=1000, total=1300, locked=false
+        let client1 = clients.get(&1).unwrap();
+        assert_eq!(client1.available, 3000000); // 300.0 * 10000
+        assert_eq!(client1.held, 10000000); // 1000.0 * 10000
+        assert_eq!(client1.total, 13000000); // 1300.0 * 10000
+        assert_eq!(client1.locked, false);
+
+        // Client 2 has chargeback on tx4 so account should be locked
+        // We expect available=300, held=0, total=300, locked=true
+        let client2 = clients.get(&2).unwrap();
+        assert_eq!(client2.available, 3000000); // 300.0 * 10000
+        assert_eq!(client2.held, 0);
+        assert_eq!(client2.total, 3000000); // 300.0 * 10000
+        assert_eq!(client2.locked, true);
+
+        // Client 3 has one unresolved dispute (tx8 = 300 held), tx7 was resolved
+        // Expected: available=450, held=300, total=750, locked=false
+        let client3 = clients.get(&3).unwrap();
+        assert_eq!(client3.available, 4500000); // 450.0 * 10000
+        assert_eq!(client3.held, 3000000); // 300.0 * 10000
+        assert_eq!(client3.total, 7500000); // 750.0 * 10000
+        assert_eq!(client3.locked, false);
+
+        assert_eq!(transactions.len(), 9);
+    }
 }
