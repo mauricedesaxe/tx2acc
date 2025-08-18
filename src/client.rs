@@ -1,9 +1,9 @@
 #[derive(Debug, Clone)]
 pub struct Client {
     client_id: u16,
-    pub available: u64,
-    pub held: u64,
-    pub total: u64,
+    pub available: i64,
+    pub held: i64,
+    pub total: i64,
     pub locked: bool,
 }
 
@@ -18,7 +18,7 @@ impl Client {
         }
     }
 
-    pub fn deposit(&mut self, amount: u64) {
+    pub fn deposit(&mut self, amount: i64) {
         self.available += amount;
         self.total += amount;
         eprintln!(
@@ -27,7 +27,7 @@ impl Client {
         );
     }
 
-    pub fn withdraw(&mut self, amount: u64) {
+    pub fn withdraw(&mut self, amount: i64) {
         if self.available >= amount {
             self.available -= amount;
             self.total -= amount;

@@ -4,6 +4,9 @@
 /// You've mentioned 4 decimals as the required precision for these numbers.
 /// I believe the cleanest way to do return client balances with the right
 /// precision is to tackle it at the entry/exit points of my system, imho.
-pub fn convert_fractional_to_number(f: f64) -> u64 {
-    (f * 10_000.0).round() as u64
+///
+/// We are using signed integers vs unsigned integers in our system
+/// to be able to represent negative balances (most banks allow negative balances)
+pub fn convert_fractional_to_number(f: f64) -> i64 {
+    (f * 10_000.0).round() as i64
 }

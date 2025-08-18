@@ -18,14 +18,14 @@ pub struct ProcessedTransaction {
     pub dispute_status: DisputeStatus,
     pub client_id: u16,
     pub transaction_id: u32,
-    pub amount: u64,
+    pub amount: i64,
 }
 
 impl ProcessedTransaction {
     pub fn new(
         transaction_id: u32,
         client_id: u16,
-        amount: u64,
+        amount: i64,
         transaction_type: ProcessedTransactionType,
     ) -> Self {
         Self {

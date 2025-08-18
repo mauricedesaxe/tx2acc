@@ -231,6 +231,7 @@ chargeback, 1, 1,
 - transaction IDs are `u32` integers
 - it's recommended that we stream values instead of loading the whole dataset as it may be large
 - code "cleanliness" is more important than performance in this exercise
+- unlike withdrawals which should be prevented, disputes are processed even if they would make the available balance negative.
 
 When in doubt on how to interpret a requirement, try to make assumptions that make sense for
 a bank (think an ATM or more elaborate transaction processors), and document them.
