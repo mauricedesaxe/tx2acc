@@ -178,8 +178,7 @@ fn handle_dispute(
     // I know unwrap is discouraged cause it can panic, but we
     // just checked that the client exists
     let client = clients.get_mut(&tx.client_id).unwrap();
-    client.available -= tx.amount;
-    client.held += tx.amount;
+    client.apply_dispute(tx.amount);
 }
 
 fn handle_resolve(
@@ -237,8 +236,7 @@ fn handle_resolve(
     // I know unwrap is discouraged cause it can panic, but we
     // just checked that the client exists
     let client = clients.get_mut(&tx.client_id).unwrap();
-    client.available += tx.amount;
-    client.held -= tx.amount;
+    client.apply_resolve(tx.amount);
 }
 
 fn handle_chargeback(
@@ -296,9 +294,7 @@ fn handle_chargeback(
     // I know unwrap is discouraged cause it can panic, but we
     // just checked that the client exists
     let client = clients.get_mut(&tx.client_id).unwrap();
-    client.held -= tx.amount;
-    client.total -= tx.amount;
-    client.locked = true;
+    client.apply_chargeback(tx.amount);
 }
 
 #[cfg(test)]

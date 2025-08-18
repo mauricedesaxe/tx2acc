@@ -41,4 +41,32 @@ impl Client {
             eprintln!("User is trying to withdraw more than they have.");
         }
     }
+
+    pub fn apply_dispute(&mut self, amount: i64) {
+        self.available -= amount;
+        self.held += amount;
+        eprintln!(
+            "Client {} applied dispute for {} and now has these balances: available={}, held={}, total={}",
+            self.client_id, amount, self.available, self.held, self.total
+        );
+    }
+
+    pub fn apply_resolve(&mut self, amount: i64) {
+        self.available += amount;
+        self.held -= amount;
+        eprintln!(
+            "Client {} resolved dispute for {} and now has these balances: available={}, held={}, total={}",
+            self.client_id, amount, self.available, self.held, self.total
+        );
+    }
+
+    pub fn apply_chargeback(&mut self, amount: i64) {
+        self.held -= amount;
+        self.total -= amount;
+        self.locked = true;
+        eprintln!(
+            "Client {} had chargeback for {} and now has these balances: available={}, held={}, total={}, locked={}",
+            self.client_id, amount, self.available, self.held, self.total, self.locked
+        );
+    }
 }
