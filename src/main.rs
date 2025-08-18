@@ -43,26 +43,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         eprintln!("CSV Row {}, {:?}", row, raw_tx);
 
-        match raw_tx.transaction_type {
-            RawTransactionType::Deposit => {
-                handle_deposit(&raw_tx, &mut transactions, &mut clients);
-            }
-            RawTransactionType::Withdrawal => {
-                handle_withdrawal(&raw_tx, &mut transactions, &mut clients);
-            }
-            RawTransactionType::Dispute => {
-                handle_dispute(&raw_tx, &mut transactions, &mut clients);
-            }
-            RawTransactionType::Resolve => {
-                handle_resolve(&raw_tx, &mut transactions, &mut clients);
-            }
-            RawTransactionType::Chargeback => {
-                handle_chargeback(&raw_tx, &mut transactions, &mut clients);
-            }
-        }
+        handle_transaction(&raw_tx, &mut transactions, &mut clients);
     }
 
     Ok(())
+}
+
+/// Takes in a raw transaction that should be a deposit,
+/// a mutable reference to a hashmap of transactions,
+/// and a mutable reference to a hashmap of clients.
+/// Modifies the hash maps to reflect the transaction/effect.
+fn handle_transaction(
+    raw_tx: &RawTransaction,
+    transactions: &mut HashMap<u32, ProcessedTransaction>,
+    clients: &mut HashMap<u16, Client>,
+) {
+    match raw_tx.transaction_type {
+        RawTransactionType::Deposit => {
+            handle_deposit(raw_tx, transactions, clients);
+        }
+        RawTransactionType::Withdrawal => {
+            handle_withdrawal(raw_tx, transactions, clients);
+        }
+        RawTransactionType::Dispute => {
+            handle_dispute(raw_tx, transactions, clients);
+        }
+        RawTransactionType::Resolve => {
+            handle_resolve(raw_tx, transactions, clients);
+        }
+        RawTransactionType::Chargeback => {
+            handle_chargeback(raw_tx, transactions, clients);
+        }
+    }
 }
 
 /// Takes in a raw transaction that should be a deposit,
