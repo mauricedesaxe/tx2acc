@@ -183,6 +183,14 @@ fn handle_dispute(
     // just checked that the transaction exists
     let tx = transactions.get_mut(&raw_tx.transaction_id).unwrap();
 
+    if raw_tx.client_id != tx.client_id {
+        eprintln!(
+            "Client {} cannot dispute transaction {} which belongs to client {}",
+            raw_tx.client_id, raw_tx.transaction_id, tx.client_id
+        );
+        return;
+    }
+
     if tx.dispute_status != DisputeStatus::Valid {
         eprintln!(
             "Failed to dispute transaction with ID {} because it is not valid.",
@@ -248,6 +256,14 @@ fn handle_resolve(
     // I know unwrap is discouraged cause it can panic, but we
     // just checked that the transaction exists
     let tx = transactions.get_mut(&raw_tx.transaction_id).unwrap();
+
+    if raw_tx.client_id != tx.client_id {
+        eprintln!(
+            "Client {} cannot resolve transaction {} which belongs to client {}",
+            raw_tx.client_id, raw_tx.transaction_id, tx.client_id
+        );
+        return;
+    }
 
     if tx.dispute_status != DisputeStatus::Disputed {
         eprintln!(
@@ -315,6 +331,14 @@ fn handle_chargeback(
     // I know unwrap is discouraged cause it can panic, but we
     // just checked that the transaction exists
     let tx = transactions.get_mut(&raw_tx.transaction_id).unwrap();
+
+    if raw_tx.client_id != tx.client_id {
+        eprintln!(
+            "Client {} cannot chargeback transaction {} which belongs to client {}",
+            raw_tx.client_id, raw_tx.transaction_id, tx.client_id
+        );
+        return;
+    }
 
     if tx.dispute_status != DisputeStatus::Disputed {
         eprintln!(
