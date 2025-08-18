@@ -300,3 +300,79 @@ fn handle_chargeback(
     client.total -= tx.amount;
     client.locked = true;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::client::Client;
+    use crate::processed_transaction::ProcessedTransaction;
+    use crate::raw_transaction::{RawTransaction, RawTransactionType};
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_handle_transaction_with_simple_data() {
+        let mut transactions: HashMap<u32, ProcessedTransaction> = HashMap::new();
+        let mut clients: HashMap<u16, Client> = HashMap::new();
+
+        // These are the same as in `data/tx/sample_1.csv`
+        let sample_transactions = vec![
+            RawTransaction {
+                transaction_type: RawTransactionType::Deposit,
+                client_id: 1,
+                transaction_id: 1,
+                amount: Some(1.0),
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Deposit,
+                client_id: 2,
+                transaction_id: 2,
+                amount: Some(5.0),
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Deposit,
+                client_id: 1,
+                transaction_id: 3,
+                amount: Some(2.0),
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Withdrawal,
+                client_id: 1,
+                transaction_id: 4,
+                amount: Some(1.5),
+            },
+            RawTransaction {
+                transaction_type: RawTransactionType::Withdrawal,
+                client_id: 2,
+                transaction_id: 5,
+                amount: Some(3.0),
+            },
+        ];
+
+        for raw_tx in &sample_transactions {
+            handle_transaction(raw_tx, &mut transactions, &mut clients);
+        }
+
+        assert_eq!(clients.len(), 2);
+        assert!(clients.contains_key(&1));
+        assert!(clients.contains_key(&2));
+
+        let client1 = clients.get(&1).unwrap();
+        assert_eq!(client1.available, 15000); // 1.5 * 10000
+        assert_eq!(client1.held, 0);
+        assert_eq!(client1.total, 15000); // 1.5 * 10000
+        assert_eq!(client1.locked, false);
+
+        let client2 = clients.get(&2).unwrap();
+        assert_eq!(client2.available, 20000); // 2.0 * 10000
+        assert_eq!(client2.held, 0);
+        assert_eq!(client2.total, 20000); // 2.0 * 10000
+        assert_eq!(client2.locked, false);
+
+        assert_eq!(transactions.len(), 5);
+        assert!(transactions.contains_key(&1));
+        assert!(transactions.contains_key(&2));
+        assert!(transactions.contains_key(&3));
+        assert!(transactions.contains_key(&4));
+        assert!(transactions.contains_key(&5));
+    }
+}
