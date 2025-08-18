@@ -57,7 +57,16 @@ fn handle_deposit(
         .entry(raw_tx.client_id)
         .or_insert(Client::new(raw_tx.client_id));
 
-    client.deposit(amount);
+    let result = client.deposit(amount);
+    if result.is_err() {
+        eprintln!(
+            "Error depositing amount {} for client {}: {}",
+            amount,
+            raw_tx.client_id,
+            result.err().unwrap()
+        );
+        return;
+    }
 
     if transactions.contains_key(&raw_tx.transaction_id) {
         // I want to ignore them because overwriting
@@ -103,7 +112,16 @@ fn handle_withdrawal(
         .entry(raw_tx.client_id)
         .or_insert(Client::new(raw_tx.client_id));
 
-    client.withdraw(amount);
+    let result = client.withdraw(amount);
+    if result.is_err() {
+        eprintln!(
+            "Error withdrawing from client {} with amount {}: {}",
+            raw_tx.client_id,
+            amount,
+            result.err().unwrap()
+        );
+        return;
+    }
 
     if transactions.contains_key(&raw_tx.transaction_id) {
         // I want to ignore them because overwriting
@@ -173,12 +191,20 @@ fn handle_dispute(
         return;
     }
 
-    tx.dispute_status = DisputeStatus::Disputed;
-
     // I know unwrap is discouraged cause it can panic, but we
     // just checked that the client exists
     let client = clients.get_mut(&tx.client_id).unwrap();
-    client.apply_dispute(tx.amount);
+    let result = client.apply_dispute(tx.amount);
+    if result.is_err() {
+        eprintln!(
+            "Failed to dispute transaction with ID {}: {}",
+            raw_tx.transaction_id,
+            result.err().unwrap()
+        );
+        return;
+    }
+
+    tx.dispute_status = DisputeStatus::Disputed;
 }
 
 fn handle_resolve(
@@ -231,12 +257,21 @@ fn handle_resolve(
         return;
     }
 
-    tx.dispute_status = DisputeStatus::Resolved;
-
     // I know unwrap is discouraged cause it can panic, but we
     // just checked that the client exists
     let client = clients.get_mut(&tx.client_id).unwrap();
-    client.apply_resolve(tx.amount);
+    let result = client.apply_resolve(tx.amount);
+    if result.is_err() {
+        eprintln!(
+            "Error resolving transaction with ID {} for client {}: {}",
+            raw_tx.transaction_id,
+            raw_tx.client_id,
+            result.err().unwrap()
+        );
+        return;
+    }
+
+    tx.dispute_status = DisputeStatus::Resolved;
 }
 
 fn handle_chargeback(
@@ -289,12 +324,21 @@ fn handle_chargeback(
         return;
     }
 
-    tx.dispute_status = DisputeStatus::ChargedBack;
-
     // I know unwrap is discouraged cause it can panic, but we
     // just checked that the client exists
     let client = clients.get_mut(&tx.client_id).unwrap();
-    client.apply_chargeback(tx.amount);
+    let result = client.apply_chargeback(tx.amount);
+    if result.is_err() {
+        eprintln!(
+            "Error charging back transaction with ID {} for client {}: {}",
+            raw_tx.transaction_id,
+            raw_tx.client_id,
+            result.err().unwrap()
+        );
+        return;
+    }
+
+    tx.dispute_status = DisputeStatus::ChargedBack;
 }
 
 #[cfg(test)]
