@@ -5,6 +5,7 @@ mod processed_transaction;
 mod raw_transaction;
 
 use client::Client;
+use convert::convert_number_to_fractional;
 use handlers::handle_transaction;
 use processed_transaction::ProcessedTransaction;
 use raw_transaction::RawTransaction;
@@ -45,6 +46,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("CSV Row {}, {:?}", row, raw_tx);
 
         handle_transaction(&raw_tx, &mut transactions, &mut clients);
+    }
+
+    println!("client,available,held,total,locked");
+    for (client_id, client) in clients.iter() {
+        let available = convert_number_to_fractional(client.available);
+        let held = convert_number_to_fractional(client.held);
+        let total = convert_number_to_fractional(client.total);
+
+        println!(
+            "{},{:.4},{:.4},{:.4},{}",
+            client_id, available, held, total, client.locked
+        );
     }
 
     Ok(())

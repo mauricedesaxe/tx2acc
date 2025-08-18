@@ -10,3 +10,10 @@
 pub fn convert_fractional_to_number(f: f64) -> i64 {
     (f * 10_000.0).round() as i64
 }
+
+/// This function takes in the number from our system and converts it
+/// back to a fractional number. This is done for the purpose of
+/// displaying the balance in a human-readable format.
+pub fn convert_number_to_fractional(i: i64) -> f64 {
+    i as f64 / 10_000.0
+}
